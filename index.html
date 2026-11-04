@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estaciones AR</title>
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.3.0/dist/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+<style>
+:root{--bg:#f6f1e7;--ink:#1f2a2e;--muted:#6b7478;--card:#fffdf8;--line:#ddd3c0;--accent:#d9561f;--ok:#2f7d4f;--bad:#b3261e;--r:12px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+.top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:5}
+.logo{font-weight:800;letter-spacing:-.02em;font-size:18px}
+.logo span{color:var(--accent)}
+.top input.name{flex:1;min-width:140px;border:1px solid transparent;background:transparent;padding:6px 8px;border-radius:8px;font-weight:600}
+.top input.name:hover,.top input.name:focus{border-color:var(--line);background:#fff;outline:none}
+.btn{border:1px solid var(--line);background:#fff;padding:7px 12px;border-radius:10px;font-weight:600}
+.btn:hover{border-color:var(--ink)}
+.btn.main{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.small{padding:4px 9px;font-size:13px}
+.btn.danger{color:var(--bad)}
+.grid{display:grid;grid-template-columns:230px 1fr 340px;gap:12px;padding:12px;align-items:start}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.panel h2{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+ul.list{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
+.st{width:100%;display:flex;gap:8px;align-items:center;text-align:left;border:1px solid var(--line);background:#fff;padding:8px;border-radius:10px}
+.st.on{border-color:var(--accent);box-shadow:0 0 0 2px #d9561f33}
+.st .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:12px;font-weight:700;flex:none}
+#previewHost{height:min(56vh,460px);border-radius:10px;overflow:hidden;touch-action:none;background:#e9e1d0;position:relative}
+#previewHost a-scene{height:100%;width:100%}
+.hint{color:var(--muted);font-size:13px;margin:8px 0 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+label.f{display:block;margin:8px 0 0;font-size:13px;color:var(--muted)}
+label.f input[type=text],label.f textarea,label.f select,label.f input:not([type]),label.f input[type=url]{width:100%;margin-top:3px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;color:var(--ink)}
+label.f textarea{min-height:70px;resize:vertical}
+label.f input[type=range]{width:100%}
+label.f input[type=color]{width:100%;height:34px;margin-top:3px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:2px}
+.lay{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-size:13px}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* play */
+#play{position:fixed;inset:0;background:#000;z-index:20}
+#arHost{position:absolute;inset:0}
+#arHost a-scene{position:absolute!important;inset:0;width:100%;height:100%}
+#hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;gap:8px;padding:10px;z-index:30;pointer-events:none}
+#hud>*{pointer-events:auto;background:#000a;color:#fff;border:0;border-radius:999px;padding:7px 14px;font-weight:600}
+#sheet{position:absolute;left:0;right:0;bottom:0;z-index:30;background:var(--card);color:var(--ink);padding:16px 16px 22px;border-radius:18px 18px 0 0;max-height:60vh;overflow:auto;box-shadow:0 -8px 30px #0006}
+#sheet h3{margin:0 28px 6px 0}
+#sheet p{margin:0 0 10px}
+#sheet .x{position:absolute;top:10px;right:12px;border:0;background:transparent;font-size:26px;line-height:1}
+.opt{display:block;width:100%;text-align:left;margin-top:6px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px}
+.opt.ok{background:#dff3e6;border-color:var(--ok)}
+.opt.bad{background:#fbe0de;border-color:var(--bad)}
+#welcome{position:fixed;inset:0;z-index:25;background:var(--bg);display:grid;place-items:center;padding:24px;text-align:center}
+#welcome .card{max-width:420px}
+#printSheet{display:none}
+@media (max-width:980px){.grid{grid-template-columns:1fr}.panel.stations ul.list{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+@media print{body>*:not(#printSheet){display:none!important}#printSheet{display:grid!important;grid-template-columns:1fr 1fr;gap:12px}#printSheet figure{margin:0;break-inside:avoid;text-align:center}#printSheet img{width:100%}}
+</style>
+</head>
+<body>
+
+<header class="top" id="topbar">
+  <div class="logo">Estaciones<span>AR</span></div>
+  <input class="name" id="tourName" aria-label="Nombre del recorrido" placeholder="Nombre del recorrido">
+  <button class="btn" id="btnPrint">Imprimir marcadores</button>
+  <button class="btn" id="btnShare">Compartir</button>
+  <button class="btn main" id="btnPlay">▶ Probar con la cámara</button>
+</header>
+
+<main class="grid" id="editor">
+  <aside class="panel stations">
+    <h2>Estaciones</h2>
+    <ul class="list" id="stList"></ul>
+    <button class="btn" id="btnAddSt" style="width:100%">+ Nueva estación</button>
+    <p class="hint">Cada estación tiene su propio marcador. Al apuntarlo con la cámara aparece su contenido.</p>
+  </aside>
+
+  <section class="panel">
+    <h2>Vista previa</h2>
+    <div id="previewHost"></div>
+    <p class="hint">Arrastrá para girar la vista, rueda o pellizco para acercar. El cuadro blanco es el marcador.</p>
+    <div class="row">
+      <button class="btn small" id="btnPng">Descargar marcador (PNG)</button>
+      <button class="btn small danger" id="btnDelSt">Borrar estación</button>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <h2>Estación</h2>
+    <label class="f">Título<input type="text" id="stTitle"></label>
+    <label class="f">Ficha informativa (se muestra al detectar el marcador)<textarea id="stInfo"></textarea></label>
+    <hr>
+    <h2>Elementos en 3D</h2>
+    <div class="lay" id="layerList"></div>
+    <div class="row" style="margin-top:0">
+      <button class="btn small" data-add="shape">+ Forma</button>
+      <button class="btn small" data-add="text">+ Texto</button>
+      <button class="btn small" data-add="image">+ Imagen</button>
+      <button class="btn small" data-add="glb">+ Modelo .glb</button>
+    </div>
+    <div id="layerEditor"></div>
+    <hr>
+    <h2>Pregunta</h2>
+    <label class="f"><input type="checkbox" id="qOn"> Agregar una pregunta a esta estación</label>
+    <div id="qBox">
+      <label class="f">Pregunta<input type="text" id="qQ"></label>
+      <label class="f">Opción 1<input type="text" id="qO0"></label>
+      <label class="f">Opción 2<input type="text" id="qO1"></label>
+      <label class="f">Opción 3<input type="text" id="qO2"></label>
+      <label class="f">Respuesta correcta
+        <select id="qC"><option value="0">Opción 1</option><option value="1">Opción 2</option><option value="2">Opción 3</option></select>
+      </label>
+    </div>
+  </aside>
+</main>
+
+<div id="play" hidden>
+  <div id="arHost"></div>
+  <div id="hud"><span id="hudInfo"></span><button id="btnExit">Salir</button></div>
+  <div id="sheet" hidden></div>
+</div>
+
+<div id="welcome" hidden>
+  <div class="card">
+    <h1 id="wTitle" style="margin:0 0 8px"></h1>
+    <p>Imprimí o mirá en otra pantalla los marcadores de cada estación y apuntalos con la cámara de tu celular.</p>
+    <button class="btn main" id="btnStart" style="font-size:17px;padding:12px 22px">Empezar recorrido</button>
+  </div>
+</div>
+
+<div id="printSheet"></div>
+<input type="file" id="fileImport" accept="application/json,.json" hidden>
+<input type="file" id="fileImg" accept="image/*" hidden>
+
+<script>
+(function(){
+'use strict';
+var LS='estacionesar_v1';
+var $=function(s,r){return (r||document).querySelector(s);};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+var uid=function(){return Math.random().toString(36).slice(2,9);};
+
+/* ---------- componentes A-Frame ---------- */
+AFRAME.registerComponent('fit-image',{init:function(){
+  var el=this.el;
+  el.addEventListener('materialtextureloaded',function(){
+    try{var img=el.getObject3D('mesh').material.map.image;if(img&&img.width){el.setAttribute('height',img.height/img.width);}}catch(e){}
+  });
+}});
+AFRAME.registerComponent('mini-orbit',{
+  init:function(){
+    var self=this;self.t=0.5;self.p=0.45;self.r=3.2;var down=false,lx=0,ly=0;
+    var bind=function(){
+      var c=self.el.sceneEl.canvas;if(!c)return;
+      c.addEventListener('pointerdown',function(e){down=true;lx=e.clientX;ly=e.clientY;});
+      window.addEventListener('pointerup',function(){down=false;});
+      window.addEventListener('pointermove',function(e){if(!down)return;self.t-=(e.clientX-lx)*0.01;self.p=Math.max(0.05,Math.min(1.45,self.p+(e.clientY-ly)*0.01));lx=e.clientX;ly=e.clientY;});
+      c.addEventListener('wheel',function(e){e.preventDefault();self.r=Math.max(1.2,Math.min(8,self.r+e.deltaY*0.004));},{passive:false});
+      var pts={},d0=0;
+      c.addEventListener('touchmove',function(e){if(e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,d=Math.hypot(dx,dy);if(d0){self.r=Math.max(1.2,Math.min(8,self.r-(d-d0)*0.01));}d0=d;}},{passive:true});
+      c.addEventListener('touchend',function(){d0=0;});
+    };
+    if(self.el.sceneEl.canvas)bind();else self.el.sceneEl.addEventListener('render-target-loaded',bind);
+  },
+  tick:function(){
+    var o=this.el.object3D,r=this.r,p=this.p,t=this.t;
+    o.position.set(r*Math.cos(p)*Math.sin(t),r*Math.sin(p)+0.3,r*Math.cos(p)*Math.cos(t));
+    o.lookAt(0,0.4,0);
+  }
+});
+
+/* ---------- marcadores (glifo 4x4) ---------- */
+function rot(g){var r=new Array(16);for(var y=0;y<4;y++)for(var x=0;x<4;x++)r[x*4+(3-y)]=g[y*4+x];return r;}
+function dist(a,b){var d=0;for(var i=0;i<16;i++)if(a[i]!==b[i])d++;return d;}
+function okAgainst(g,other){var o=other;for(var i=0;i<4;i++){if(dist(g,o)<6)return false;o=rot(o);}return true;}
+function rnd(){return Array.apply(null,Array(16)).map(function(){return Math.random()<0.5?1:0;});}
+function newGlyph(existing){
+  for(var t=0;t<4000;t++){
+    var g=rnd();var n=g.reduce(function(a,b){return a+b;},0);
+    if(n<6||n>10)continue;
+    var r=g,self=true;
+    for(var i=0;i<3;i++){r=rot(r);if(dist(g,r)<5){self=false;break;}}
+    if(!self)continue;
+    if(existing.every(function(e){return okAgainst(g,e);}))return g;
+  }
+  return rnd();
+}
+function drawInner(ctx,x,y,s,g){
+  ctx.fillStyle='#fff';ctx.fillRect(x,y,s,s);ctx.fillStyle='#000';
+  var c=s/4;
+  for(var i=0;i<16;i++)if(g[i])ctx.fillRect(x+(i%4)*c,y+Math.floor(i/4)*c,c+0.5,c+0.5);
+}
+function markerCanvas(g,label){
+  var S=640,m=64,b=512,cv=document.createElement('canvas');
+  cv.width=S;cv.height=S+(label?80:0);
+  var ctx=cv.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#000';ctx.fillRect(m,m,b,b);
+  drawInner(ctx,m+128,m+128,256,g);
+  if(label){ctx.fillStyle='#000';ctx.font='bold 34px system-ui,sans-serif';ctx.textAlign='center';ctx.fillText(label.slice(0,36),S/2,S+30);}
+  return cv;
+}
+function pattText(g){
+  var src=document.createElement('canvas');src.width=src.height=16;
+  drawInner(src.getContext('2d'),0,0,16,g);
+  var cv=document.createElement('canvas');cv.width=cv.height=16;
+  var ctx=cv.getContext('2d'),out='';
+  for(var k=0;k<4;k++){
+    ctx.save();ctx.clearRect(0,0,16,16);ctx.translate(8,8);ctx.rotate(-k*Math.PI/2);ctx.drawImage(src,-8,-8);ctx.restore();
+    var d=ctx.getImageData(0,0,16,16).data;
+    if(k)out+='\n';
+    for(var ch=2;ch>=0;ch--){
+      for(var y=0;y<16;y++){
+        for(var x=0;x<16;x++){
+          if(x)out+=' ';
+          out+=String(d[(y*16+x)*4+ch]).padStart(3);
+        }
+        out+='\n';
+      }
+    }
+  }
+  return out;
+}
+
+/* ---------- datos ---------- */
+function newLayer(type){
+  var base={id:uid(),type:type,x:0,y:0,z:0,s:1,anim:'ninguna'};
+  if(type==='shape'){base.kind='cubo';base.color='#d9561f';}
+  if(type==='text'){base.value='Texto';base.color='#222222';base.y=1.1;}
+  if(type==='image'){base.src='';base.y=0.5;}
+  if(type==='glb'){base.src='';}
+  return base;
+}
+function sample(){
+  var g1=newGlyph([]),g2=newGlyph([g1]);
+  return {name:'Mi primer recorrido',stations:[
+    {id:uid(),title:'El Sol',glyph:g1,info:'El Sol es una estrella: una enorme esfera de gas muy caliente que da luz y calor a todos los planetas.',
+     layers:[{id:uid(),type:'shape',kind:'esfera',color:'#ffb000',x:0,y:0,z:0,s:1.3,anim:'flotar'},{id:uid(),type:'text',value:'El Sol',color:'#222222',x:0,y:1.7,z:0,s:1,anim:'ninguna'}],
+     quiz:{on:true,q:'¿Qué es el Sol?',opts:['Un planeta','Una estrella','Un satélite'],ok:1}},
+    {id:uid(),title:'La Tierra',glyph:g2,info:'La Tierra es el tercer planeta desde el Sol y el único donde conocemos vida.',
+     layers:[{id:uid(),type:'shape',kind:'esfera',color:'#2f7dd1',x:0,y:0,z:0,s:1,anim:'girar'},{id:uid(),type:'text',value:'La Tierra',color:'#222222',x:0,y:1.4,z:0,s:1,anim:'ninguna'}],
+     quiz:{on:true,q:'¿Qué lugar ocupa la Tierra desde el Sol?',opts:['Segundo','Tercero','Cuarto'],ok:1}}
+  ]};
+}
+function normalize(t){
+  if(!t||!Array.isArray(t.stations)||!t.stations.length)return null;
+  var seen=[];
+  t.name=String(t.name||'Recorrido');
+  t.stations.forEach(function(s){
+    s.id=s.id||uid();s.title=String(s.title||'');s.info=String(s.info||'');
+    if(!Array.isArray(s.glyph)||s.glyph.length!==16)s.glyph=newGlyph(seen);
+    seen.push(s.glyph);
+    s.layers=Array.isArray(s.layers)?s.layers:[];
+    s.layers.forEach(function(l){l.id=l.id||uid();});
+    s.quiz=s.quiz||{on:false,q:'',opts:['','',''],ok:0};
+    if(!Array.isArray(s.quiz.opts))s.quiz.opts=['','',''];
+  });
+  return t;
+}
+function load(){try{return normalize(JSON.parse(localStorage.getItem(LS)));}catch(e){return null;}}
+var warned=false;
+function save(){try{localStorage.setItem(LS,JSON.stringify(tour));}catch(e){if(!warned){warned=true;alert('No pude guardar en este navegador (probablemente hay imágenes muy pesadas). Exportá el recorrido como archivo para no perder el trabajo.');}}}
+
+var tour=load()||sample();
+var selS=0,selL=0,studentMode=false;
+function cur(){return tour.stations[selS];}
+function curL(){return cur().layers[selL];}
+
+/* ---------- 3D ---------- */
+function shapeHTML(L){
+  var m='material="color:'+esc(L.color)+';roughness:0.55;metalness:0.1"';
+  switch(L.kind){
+    case 'esfera':return '<a-sphere '+m+' radius="0.35" position="0 0.35 0"></a-sphere>';
+    case 'cono':return '<a-cone '+m+' radius-bottom="0.35" radius-top="0" height="0.8" position="0 0.4 0"></a-cone>';
+    case 'cilindro':return '<a-cylinder '+m+' radius="0.3" height="0.7" position="0 0.35 0"></a-cylinder>';
+    case 'toro':return '<a-torus '+m+' radius="0.3" radius-tubular="0.09" position="0 0.45 0"></a-torus>';
+    case 'piramide':return '<a-cone '+m+' segments-radial="4" radius-bottom="0.45" radius-top="0" height="0.7" position="0 0.35 0"></a-cone>';
+    default:return '<a-box '+m+' width="0.6" height="0.6" depth="0.6" position="0 0.3 0"></a-box>';
+  }
+}
+function layerHTML(L){
+  var pos=L.x+' '+L.y+' '+L.z,sc=L.s+' '+L.s+' '+L.s,anim='';
+  if(L.anim==='girar')anim+=' animation__spin="property:rotation;to:0 360 0;dur:6000;loop:true;easing:linear"';
+  if(L.anim==='flotar')anim+=' animation__float="property:position;dir:alternate;from:'+pos+';to:'+L.x+' '+(+L.y+0.25)+' '+L.z+';dur:1300;loop:true;easing:easeInOutSine"';
+  var inner='';
+  if(L.type==='shape')inner=shapeHTML(L);
+  else if(L.type==='text')inner='<a-text value="'+esc(L.value)+'" color="'+esc(L.color)+'" align="center" width="3" wrap-count="20" side="double"></a-text>';
+  else if(L.type==='image'&&L.src)inner='<a-image src="'+esc(L.src)+'" width="1" height="1" fit-image></a-image>';
+  else if(L.type==='glb'&&L.src)inner='<a-gltf-model src="'+esc(L.src)+'"></a-gltf-model>';
+  return '<a-entity position="'+pos+'" scale="'+sc+'"'+anim+'>'+inner+'</a-entity>';
+}
+function stationHTML(s){return s.layers.map(layerHTML).join('');}
+
+var mkCache={};
+function markerURL(s){var k=s.id+s.glyph.join('');if(!mkCache[k])mkCache[k]=markerCanvas(s.glyph).toDataURL('image/png');return mkCache[k];}
+
+/* ---------- vista previa ---------- */
+function mountPreview(){
+  $('#previewHost').innerHTML='<a-scene embedded vr-mode-ui="enabled:false" renderer="antialias:true" background="color:#e9e1d0">'+
+    '<a-plane id="pvMarker" rotation="-90 0 0" width="1.25" height="1.25"></a-plane>'+
+    '<a-entity id="pvGroup"></a-entity>'+
+    '<a-light type="ambient" color="#ffffff" intensity="0.8"></a-light>'+
+    '<a-light type="directional" color="#ffffff" intensity="0.8" position="1 3 2"></a-light>'+
+    '<a-entity camera mini-orbit></a-entity></a-scene>';
+  refreshPreview();
+}
+function destroyPreview(){var sc=$('#previewHost a-scene');if(sc&&sc.parentNode)sc.parentNode.removeChild(sc);$('#previewHost').innerHTML='';}
+var pvTimer=null;
+function refreshPreview(){
+  clearTimeout(pvTimer);
+  pvTimer=setTimeout(function(){
+    var sc=$('#previewHost a-scene');if(!sc)return;
+    if(!sc.hasLoaded){sc.addEventListener('loaded',refreshPreview,{once:true});return;}
+    var g=$('#pvGroup'),p=$('#pvMarker');if(!g||!p)return;
+    g.innerHTML=stationHTML(cur());
+    p.setAttribute('material',{shader:'flat',src:markerURL(cur())});
+  },60);
+}
+
+/* ---------- editor ---------- */
+function renderStations(){
+  $('#stList').innerHTML=tour.stations.map(function(s,i){
+    return '<li><button class="st'+(i===selS?' on':'')+'" data-i="'+i+'"><span class="n">'+(i+1)+'</span><span>'+esc(s.title||'Sin título')+'</span></button></li>';
+  }).join('');
+}
+function renderLayerList(){
+  var s=cur(),names={shape:'Forma',text:'Texto',image:'Imagen',glb:'Modelo'};
+  $('#layerList').innerHTML=s.layers.length?s.layers.map(function(l,i){
+    var extra=l.type==='text'?': '+(l.value||'').slice(0,12):l.type==='shape'?': '+l.kind:'';
+    return '<button class="chip'+(i===selL?' on':'')+'" data-l="'+i+'">'+names[l.type]+esc(extra)+'</button>';
+  }).join(''):'<span class="hint">Todavía no hay elementos. Agregá uno abajo.</span>';
+}
+function renderLayerEditor(){
+  var L=curL(),box=$('#layerEditor');
+  if(!L){box.innerHTML='';return;}
+  var h='<hr>';
+  if(L.type==='shape'){
+    h+='<div class="two"><label class="f">Figura<select data-k="kind">'+
+      [['cubo','Cubo'],['esfera','Esfera'],['cono','Cono'],['cilindro','Cilindro'],['toro','Toro'],['piramide','Pirámide']].map(function(o){return '<option value="'+o[0]+'"'+(L.kind===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+
+      '</select></label><label class="f">Color<input type="color" data-k="color" value="'+esc(L.color)+'"></label></div>';
+  }
+  if(L.type==='text'){
+    h+='<label class="f">Texto<textarea data-k="value">'+esc(L.value)+'</textarea></label><label class="f">Color<input type="color" data-k="color" value="'+esc(L.color)+'"></label>';
+  }
+  if(L.type==='image'){
+    h+='<label class="f">Dirección (URL) de la imagen<input type="text" data-k="src" value="'+(L.src&&L.src.indexOf('data:')===0?'':esc(L.src))+'" placeholder="https://…"></label>'+
+       '<button class="btn small" id="btnPickImg" style="margin-top:8px">Subir imagen desde el dispositivo</button>'+(L.src&&L.src.indexOf('data:')===0?'<p class="hint">Imagen cargada desde el dispositivo.</p>':'');
+  }
+  if(L.type==='glb'){
+    h+='<label class="f">Dirección (URL) del modelo .glb<input type="text" data-k="src" value="'+esc(L.src)+'" placeholder="https://… o modelos/arbol.glb"></label>'+
+       '<p class="hint">Si publicás la app en GitHub Pages, podés subir los .glb al mismo repositorio y poner la ruta relativa.</p>';
+  }
+  var rg=function(k,lab,min,max,step){return '<label class="f">'+lab+' ('+L[k]+')<input type="range" data-k="'+k+'" data-num="1" min="'+min+'" max="'+max+'" step="'+step+'" value="'+L[k]+'"></label>';};
+  h+=rg('x','Izquierda / derecha',-1,1,0.05)+rg('y','Altura',-0.5,2,0.05)+rg('z','Adelante / atrás',-1,1,0.05)+rg('s','Tamaño',0.2,3,0.05);
+  h+='<label class="f">Movimiento<select data-k="anim">'+[['ninguna','Ninguno'],['girar','Girar'],['flotar','Flotar']].map(function(o){return '<option value="'+o[0]+'"'+(L.anim===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></label>';
+  h+='<div class="row"><button class="btn small danger" id="btnDelL">Quitar este elemento</button></div>';
+  box.innerHTML=h;
+}
+function loadStationFields(){
+  var s=cur();
+  $('#stTitle').value=s.title;$('#stInfo').value=s.info;
+  $('#qOn').checked=!!s.quiz.on;$('#qBox').hidden=!s.quiz.on;
+  $('#qQ').value=s.quiz.q||'';
+  for(var i=0;i<3;i++)$('#qO'+i).value=s.quiz.opts[i]||'';
+  $('#qC').value=String(s.quiz.ok||0);
+}
+function renderAll(){
+  $('#tourName').value=tour.name;
+  if(selS>=tour.stations.length)selS=0;
+  if(selL>=cur().layers.length)selL=cur().layers.length-1;
+  if(selL<0&&cur().layers.length)selL=0;
+  renderStations();loadStationFields();renderLayerList();renderLayerEditor();refreshPreview();
+}
+
+/* eventos del editor */
+$('#tourName').addEventListener('input',function(e){tour.name=e.target.value;save();});
+$('#stList').addEventListener('click',function(e){var b=e.target.closest('.st');if(!b)return;selS=+b.dataset.i;selL=0;renderAll();});
+$('#btnAddSt').addEventListener('click',function(){
+  var g=newGlyph(tour.stations.map(function(s){return s.glyph;}));
+  tour.stations.push({id:uid(),title:'Estación '+(tour.stations.length+1),glyph:g,info:'',layers:[newLayer('shape')],quiz:{on:false,q:'',opts:['','',''],ok:0}});
+  selS=tour.stations.length-1;selL=0;save();renderAll();
+});
+$('#btnDelSt').addEventListener('click',function(){
+  if(tour.stations.length<2){alert('El recorrido necesita al menos una estación.');return;}
+  if(!confirm('¿Borrar la estación «'+(cur().title||'sin título')+'»?'))return;
+  tour.stations.splice(selS,1);selS=Math.max(0,selS-1);selL=0;save();renderAll();
+});
+$('#stTitle').addEventListener('input',function(e){cur().title=e.target.value;save();renderStations();});
+$('#stInfo').addEventListener('input',function(e){cur().info=e.target.value;save();});
+$('#qOn').addEventListener('change',function(e){cur().quiz.on=e.target.checked;$('#qBox').hidden=!e.target.checked;save();});
+$('#qQ').addEventListener('input',function(e){cur().quiz.q=e.target.value;save();});
+[0,1,2].forEach(function(i){$('#qO'+i).addEventListener('input',function(e){cur().quiz.opts[i]=e.target.value;save();});});
+$('#qC').addEventListener('change',function(e){cur().quiz.ok=+e.target.value;save();});
+document.querySelectorAll('[data-add]').forEach(function(b){b.addEventListener('click',function(){
+  cur().layers.push(newLayer(b.dataset.add));selL=cur().layers.length-1;save();renderLayerList();renderLayerEditor();refreshPreview();
+});});
+$('#layerList').addEventListener('click',function(e){var b=e.target.closest('[data-l]');if(!b)return;selL=+b.dataset.l;renderLayerList();renderLayerEditor();});
+function onLayerInput(e){
+  var k=e.target.dataset.k;if(!k)return;var L=curL();if(!L)return;
+  L[k]=e.target.dataset.num?parseFloat(e.target.value):e.target.value;
+  if(e.target.type==='range'){var lb=e.target.closest('label');if(lb)lb.firstChild.nodeValue=lb.firstChild.nodeValue.replace(/\(.*\)/,'('+L[k]+')');}
+  save();renderLayerList();refreshPreview();
+}
+$('#layerEditor').addEventListener('input',onLayerInput);
+$('#layerEditor').addEventListener('change',function(e){if(e.target.tagName==='SELECT')onLayerInput(e);});
+$('#layerEditor').addEventListener('click',function(e){
+  if(e.target.id==='btnDelL'){cur().layers.splice(selL,1);selL=Math.max(0,selL-1);save();renderLayerList();renderLayerEditor();refreshPreview();}
+  if(e.target.id==='btnPickImg')$('#fileImg').click();
+});
+$('#fileImg').addEventListener('change',function(e){
+  var f=e.target.files[0];e.target.value='';if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    var im=new Image();
+    im.onload=function(){
+      var k=Math.min(1,480/Math.max(im.width,im.height)),cv=document.createElement('canvas');
+      cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);
+      cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+      var L=curL();if(!L||L.type!=='image')return;
+      L.src=cv.toDataURL('image/jpeg',0.75);save();renderLayerEditor();refreshPreview();
+    };
+    im.src=rd.result;
+  };
+  rd.readAsDataURL(f);
+});
+$('#btnPng').addEventListener('click',function(){
+  var a=document.createElement('a');a.href=markerCanvas(cur().glyph,(selS+1)+'. '+cur().title).toDataURL('image/png');
+  a.download='marcador-'+(selS+1)+'.png';a.click();
+});
+
+/* ---------- imprimir ---------- */
+$('#btnPrint').addEventListener('click',function(){
+  $('#printSheet').innerHTML=tour.stations.map(function(s,i){
+    return '<figure><img alt="" src="'+markerCanvas(s.glyph,(i+1)+'. '+s.title).toDataURL('image/png')+'"></figure>';
+  }).join('');
+  setTimeout(function(){window.print();},150);
+});
+
+/* ---------- compartir ---------- */
+function toB64(str){var b=new TextEncoder().encode(str),s='';for(var i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s);}
+function fromB64(b){var s=atob(b),a=new Uint8Array(s.length);for(var i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return new TextDecoder().decode(a);}
+function shareDialog(){
+  var base=location.href.split('#')[0],data=encodeURIComponent(toB64(JSON.stringify(tour)));
+  var link=base+'#p=1&t='+data;
+  var msg='Compartir recorrido\n\n1) Copiar enlace para alumnos (abre el recorrido listo para usar)\n2) Descargar archivo del recorrido (.json)\n3) Importar un archivo .json\n\nEscribí 1, 2 o 3:';
+  var o=prompt(msg,'1');
+  if(o==='1'){
+    if(link.length>7000)alert('Atención: el enlace es muy largo (por las imágenes subidas). Mejor compartí el archivo .json o usá imágenes por URL.');
+    if(navigator.clipboard)navigator.clipboard.writeText(link).then(function(){alert('Enlace copiado.');},function(){prompt('Copiá el enlace:',link);});
+    else prompt('Copiá el enlace:',link);
+  }else if(o==='2'){
+    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(tour,null,1)],{type:'application/json'}));
+    a.download=(tour.name||'recorrido').replace(/[^\w-]+/g,'_')+'.estaciones.json';a.click();
+  }else if(o==='3'){$('#fileImport').click();}
+}
+$('#btnShare').addEventListener('click',shareDialog);
+$('#fileImport').addEventListener('change',function(e){
+  var f=e.target.files[0];e.target.value='';if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{var t=normalize(JSON.parse(rd.result));if(!t)throw 0;tour=t;selS=0;selL=0;save();renderAll();}
+    catch(err){alert('Ese archivo no parece un recorrido válido.');}
+  };
+  rd.readAsText(f);
+});
+
+/* ---------- modo cámara ---------- */
+var answers={},score={ok:0,tot:0},seen={},curSheet=null;
+function hud(){$('#hudInfo').textContent='Estaciones: '+Object.keys(seen).length+'/'+tour.stations.length+(score.tot?'  ·  Aciertos: '+score.ok+'/'+score.tot:'');}
+function showSheet(s){
+  curSheet=s.id;
+  var q=s.quiz&&s.quiz.on&&s.quiz.q?s.quiz:null,a=answers[s.id],h='<button class="x" id="sheetX" aria-label="Cerrar">×</button><h3>'+esc(s.title)+'</h3>';
+  if(s.info)h+='<p>'+esc(s.info).replace(/\n/g,'<br>')+'</p>';
+  if(q){
+    h+='<div><strong>'+esc(q.q)+'</strong>'+q.opts.map(function(o,i){
+      if(!o)return '';
+      var c='';if(a!=null){if(i===q.ok)c=' ok';else if(i===a)c=' bad';}
+      return '<button class="opt'+c+'" data-i="'+i+'"'+(a!=null?' disabled':'')+'>'+esc(o)+'</button>';
+    }).join('')+'</div>';
+  }
+  $('#sheet').innerHTML=h;$('#sheet').hidden=false;
+}
+$('#sheet').addEventListener('click',function(e){
+  if(e.target.id==='sheetX'){$('#sheet').hidden=true;return;}
+  var b=e.target.closest('.opt');if(!b||b.disabled)return;
+  var s=tour.stations.filter(function(x){return x.id===curSheet;})[0];if(!s)return;
+  var i=+b.dataset.i;answers[s.id]=i;score.tot++;if(i===s.quiz.ok)score.ok++;
+  showSheet(s);hud();
+});
+function startPlay(){
+  if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    alert('La cámara solo funciona con HTTPS (o localhost). Publicá la app, por ejemplo en GitHub Pages, y abrila desde el celular.');return;
+  }
+  destroyPreview();
+  answers={};score={ok:0,tot:0};seen={};curSheet=null;
+  $('#editor').hidden=true;$('#topbar').hidden=true;$('#welcome').hidden=true;$('#play').hidden=false;$('#sheet').hidden=true;
+  var markers=tour.stations.map(function(s){
+    var url=URL.createObjectURL(new Blob([pattText(s.glyph)],{type:'text/plain'}));
+    return '<a-marker type="pattern" url="'+url+'" size="1" smooth="true" smoothCount="8" emitevents="true" data-sid="'+s.id+'">'+stationHTML(s)+'</a-marker>';
+  }).join('');
+  $('#arHost').innerHTML='<a-scene embedded vr-mode-ui="enabled:false" renderer="logarithmicDepthBuffer:true;precision:medium" arjs="trackingMethod:best;sourceType:webcam;debugUIEnabled:false;detectionMode:mono;" device-orientation-permission-ui="enabled:false">'+markers+'<a-entity camera></a-entity></a-scene>';
+  $('#arHost').querySelectorAll('a-marker').forEach(function(m){
+    m.addEventListener('markerFound',function(){
+      var s=tour.stations.filter(function(x){return x.id===m.dataset.sid;})[0];if(!s)return;
+      seen[s.id]=1;hud();
+      if(curSheet!==s.id||$('#sheet').hidden)showSheet(s);
+    });
+  });
+  hud();
+}
+function stopPlay(){
+  var sc=$('#arHost a-scene');
+  document.querySelectorAll('video').forEach(function(v){try{if(v.srcObject)v.srcObject.getTracks().forEach(function(t){t.stop();});}catch(e){}if(v.parentNode)v.parentNode.removeChild(v);});
+  if(sc&&sc.parentNode)sc.parentNode.removeChild(sc);
+  $('#arHost').innerHTML='';
+  $('#play').hidden=true;
+  if(studentMode){$('#welcome').hidden=false;}
+  else{$('#editor').hidden=false;$('#topbar').hidden=false;mountPreview();}
+}
+$('#btnPlay').addEventListener('click',startPlay);
+$('#btnExit').addEventListener('click',stopPlay);
+$('#btnStart').addEventListener('click',startPlay);
+
+/* ---------- arranque ---------- */
+(function init(){
+  var h=location.hash.replace(/^#/,''),m=h.match(/(?:^|&)t=([^&]+)/),p=/(?:^|&)p=1/.test(h);
+  if(m){
+    try{
+      var t=normalize(JSON.parse(fromB64(decodeURIComponent(m[1]))));
+      if(t){
+        if(p){tour=t;studentMode=true;$('#wTitle').textContent=t.name;$('#editor').hidden=true;$('#topbar').hidden=true;$('#welcome').hidden=false;return;}
+        if(confirm('Este enlace trae el recorrido «'+t.name+'». ¿Abrirlo en el editor? Reemplaza el que tenés ahora.')){tour=t;save();}
+      }
+    }catch(e){}
+  }
+  renderAll();mountPreview();
+})();
+})();
+</script>
+</body>
+</html>
